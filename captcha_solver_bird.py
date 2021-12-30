@@ -48,7 +48,7 @@ def parse_opt():
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     return opt
-def parse_opt_recaptcha():
+def parse_opt_rotate():
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, default='rotate.pt', help='rotate.pt path(s)')
     parser.add_argument('--source', type=str, default='data/images', help='file/dir/URL/glob, 0 for webcam')
@@ -78,12 +78,41 @@ def parse_opt_recaptcha():
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     return opt
 
+def parse_opt_funcaptcha():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--weights', nargs='+', type=str, default='funcaptcha.pt', help='funcaptcha.pt path(s)')
+    parser.add_argument('--source', type=str, default='data/images', help='file/dir/URL/glob, 0 for webcam')
+    parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
+    parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
+    parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
+    parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
+    parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--view-img', action='store_true', help='show results')
+    parser.add_argument('--save-txt', default=False, action='store_true', help='save results to *.txt')
+    parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
+    parser.add_argument('--save-crop', default=False, action='store_true', help='save cropped prediction boxes')
+    parser.add_argument('--nosave', default = True, action='store_true', help='do not save images/videos')
+    parser.add_argument('--classes', nargs='+', type=int, help='filter by class: --class 0, or --class 0 2 3') #--class 0 1 2 3 4 5 6 7 8 9 10 11 12
+    parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
+    parser.add_argument('--augment', action='store_true', help='augmented inference')
+    parser.add_argument('--visualize', action='store_true', help='visualize features')
+    parser.add_argument('--update', action='store_true', help='update all models')
+    parser.add_argument('--project', default='runs/detect', help='save results to project/name')
+    parser.add_argument('--name', default='exp', help='save results to project/name')
+    parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
+    parser.add_argument('--line-thickness', default=3, type=int, help='bounding box thickness (pixels)')
+    parser.add_argument('--hide-labels', default=False, action='store_true', help='hide labels')
+    parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
+    parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
+    opt = parser.parse_args()
+    opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
+    return opt
 
 api_key = "7z5w7qEedErY51yXLjQ"
-url_gettask_captchatext = 'https://simplecaptcha.net/api/v1/ResolveCaptcha?key='+api_key+'&numWantGet=1&captchaType=imagecaptcha'
+url_gettask_captchatext = 'https://simplecaptcha.net/api/v1/ResolveCaptcha?key='+api_key+'&numWantGet=1&captchaType=all'
 url_gettask_recaptcha = 'https://simplecaptcha.net/api/v1/ResolveCaptcha?key='+api_key+'&numWantGet=1&captchaType=recaptcha'
 url_respon = 'https://simplecaptcha.net/api/v1/ResolveCaptcha?key='+api_key
-num_thread = 1
+num_thread = 10
 round_run = 0
 linux = True
 sl = '//'
@@ -92,9 +121,13 @@ sl = '//'
 opt = parse_opt()
 print("LoadModel Check bird")
 stride_img,imgsz_img,pt_img,device_img,onnx_img,half_img,model_img,classify_img,names_img = checkbird.LoadModel(**vars(opt))
-opt_recaptcha = parse_opt_recaptcha()
+opt_rotate = parse_opt_rotate()
 print("LoadModel Rotate")
-stride_re,imgsz_re,pt_re,device_re,onnx_re,half_re,model_re,classify_re,names_re = checkbird.LoadModel(**vars(opt_recaptcha))
+stride_ro,imgsz_ro,pt_ro,device_ro,onnx_ro,half_ro,model_ro,classify_ro,names_ro = checkbird.LoadModel(**vars(opt_rotate))
+
+opt_funcaptcha = parse_opt_funcaptcha()
+print("LoadModel Funcaptcha")
+stride_re,imgsz_re,pt_re,device_re,onnx_re,half_re,model_re,classify_re,names_re = checkbird.LoadModel(**vars(opt_funcaptcha))
 
 
 
@@ -211,7 +244,7 @@ def get_task_captchatext(self,api_key, url, path, images_folder,result_folder):
                     if(question == "bird"):
                         checkbird.run(source,stride_img,imgsz_img,pt_img,device_img,onnx_img,half_img,model_img,classify_img,names_img)
                     elif(question == "rotate"):
-                        checkbird.run(source,stride_re,imgsz_re,pt_re,device_re,onnx_re,half_re,model_re,classify_re,names_re)
+                        checkbird.run(source,stride_ro,imgsz_ro,pt_ro,device_ro,onnx_ro,half_ro,model_ro,classify_ro,names_ro)
                     for i in range(5):
                         if os.path.exists(result_path):
                             file = open(result_path,"r+") 
@@ -238,19 +271,17 @@ def get_task_captchatext(self,api_key, url, path, images_folder,result_folder):
                     else:
                         captcha = ""
                 elif data[0]["captchaType"] == "recaptcha":
-                    getpoint = False
+                    getpoint = True
                     w = im.size[0]
                     h = im.size[1]
                     question = data[0]["questionText"]
-                    
+                    print(question)
                     detect_size =[]
                     if "|" in question:
                         tmp = question
                         question = tmp.split('|')[0]
                         detect_size.append(int(tmp.split('|')[1]))
                         detect_size.append(int(tmp.split('|')[2]))
-                    if (question == "getpoint") or ("correct way up" in question) :
-                        getpoint = True
                     if question == "boats or ships":
                         question = "boat"
                     if question[-1] == "s" and question != "bus":
@@ -300,6 +331,7 @@ def get_task_captchatext(self,api_key, url, path, images_folder,result_folder):
                         #         time.sleep(random.randint(1,2))
                         if captcha == "|":
                             captcha = "None"
+                   
                    
                 print(f"JobID:{id}, Result: {captcha}")
                 #jsons = {'JobId':id,'Result':captcha, 'AnswerQuestion': captcha}
